@@ -5,19 +5,7 @@ from packaging.version import Version
 
 
 def collect_tips() -> list[dict[str, str]]:
-    old_vers = list(
-        filter(
-            lambda s: s.startswith("v"),
-            map(
-                lambda b: b.strip(),
-                subprocess.run(["git", "branch"], capture_output=True)
-                .stdout.decode(encoding="ascii")
-                .split(),
-            ),
-        )
-    )
-
-    new_vers = (
+    vers = (
         subprocess.run(["git", "tag"], capture_output=True)
         .stdout.decode(encoding="ascii")
         .split()
@@ -26,34 +14,36 @@ def collect_tips() -> list[dict[str, str]]:
     tips = {}
 
     try:
-        for old_ver in old_vers:
+        for version in vers:
             subprocess.run(
-                ["git", "checkout", old_ver], check=True, capture_output=True
+                ["git", "checkout", version], check=True, capture_output=True
             )
-            with open("MonoBehaviour/ShowTips.json", mode="r", encoding="utf-8") as fp:
+
+            match version[1]:
+                case "1":
+                    path = "MonoBehaviour/ShowTips.json"
+
+                    def get_list(data: dict):
+                        return map(lambda t: t.strip(), data["chinese"].split("/"))
+                case "2":
+                    path = "MonoBehaviour/ShowTips.json"
+
+                    def get_list(data: dict):
+                        return map(lambda t: t.strip(), data["chinese"].split("\r\n"))
+                case "3":
+                    path = "MonoBehaviour/TipsProvider.json"
+
+                    def get_list(data: dict):
+                        return map(lambda t: t.strip(), data["tips"][0]["tips"])
+                case _:
+                    raise Exception(f"Unsupported version: {version}")
+
+            with open(path, mode="r", encoding="utf-8") as fp:
                 data = json.load(fp)
-                if old_ver.startswith("v1"):
-                    tips_list = map(lambda t: t.strip(), data["chinese"].split("/"))
-                elif old_ver.startswith("v2"):
-                    tips_list = map(lambda t: t.strip(), data["chinese"].split("\r\n"))
-                else:
-                    raise Exception(f"Unsupported old version: {old_ver}")
-                for tip in tips_list:
-                    ver_list = tips.get(tip, []) + [old_ver]
+                for tip in get_list(data):
+                    ver_list = tips.get(tip, []) + [version]
                     tips[tip] = ver_list
 
-        for new_ver in new_vers:
-            subprocess.run(
-                ["git", "checkout", new_ver], check=True, capture_output=True
-            )
-            with open(
-                "MonoBehaviour/TipsProvider.json", mode="r", encoding="utf-8"
-            ) as fp:
-                data = json.load(fp)
-                tips_list = map(lambda t: t.strip(), data["tips"][0]["tips"])
-                for tip in tips_list:
-                    ver_list = tips.get(tip, []) + [new_ver]
-                    tips[tip] = ver_list
     finally:
         subprocess.run(["git", "checkout", "main"], capture_output=True)
 
