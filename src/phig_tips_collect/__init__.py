@@ -4,7 +4,7 @@ import subprocess
 from packaging.version import Version
 
 
-def collect_tips() -> list[dict[str, str]]:
+def collect_tips(version_range: str = None) -> list[dict[str, str]]:
     vers = (
         subprocess.run(["git", "tag"], capture_output=True)
         .stdout.decode(encoding="ascii")
@@ -14,7 +14,21 @@ def collect_tips() -> list[dict[str, str]]:
     tips = {}
 
     try:
+        if version_range is not None:
+            minv, maxv = map(lambda v: Version(v), version_range.split(".."))
+
+            def filter_version(version: str) -> bool:
+                v = Version(version)
+                return v < minv or v > maxv
+        else:
+
+            def filter_version(_: str) -> bool:
+                return False
+
         for version in vers:
+            if filter_version(version):
+                continue
+
             subprocess.run(
                 ["git", "checkout", version], check=True, capture_output=True
             )
@@ -25,12 +39,12 @@ def collect_tips() -> list[dict[str, str]]:
 
                     def get_list(data: dict):
                         return map(lambda t: t.strip(), data["chinese"].split("/"))
-                case "2":
+                case "2" if Version(version) < Version("v2.2"):
                     path = "MonoBehaviour/ShowTips.json"
 
                     def get_list(data: dict):
                         return map(lambda t: t.strip(), data["chinese"].split("\r\n"))
-                case "3":
+                case "2" | "3":
                     path = "MonoBehaviour/TipsProvider.json"
 
                     def get_list(data: dict):

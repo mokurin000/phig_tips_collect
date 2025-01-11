@@ -1,7 +1,8 @@
 # Phigros Tips collect
 
 ```bash
-git submodule update
 uv run pip install -e .
+
+git submodule update --remote
 uv run python -m phig_tips_collect
 ```
